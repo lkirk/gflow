@@ -15,8 +15,9 @@ $(gflow):
 	CGO_ENABLED=0 go build
 
 ## remove binary
+.PHONY: clean
 clean:
-	rm $(gflow)
+	rm -f $(gflow)
 
 ## release
 RELEASE-INCREMENTS:=major minor patch
