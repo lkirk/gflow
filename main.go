@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -24,6 +25,27 @@ func init() {
 type JobState struct {
 	ID    int
 	mutex *sync.Mutex
+}
+
+type Workflow struct {
+	jobs []*Job
+}
+
+func (w *Workflow) InitFlags() {
+	// TODO: add flag parsing here
+}
+
+func (w *Workflow) Run() {
+	wg := &sync.WaitGroup{}
+
+	for _, j := range w.jobs {
+		j.initJob()
+		fmt.Printf("%s\n", j.toJson())
+		wg.Add(1)
+		go j.runJob(wg)
+	}
+
+	wg.Wait()
 }
 
 func (j *JobState) increment() int {
@@ -136,17 +158,33 @@ func (j *Job) runJob(wg *sync.WaitGroup) {
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Dir = j.JobDir
+
 	err := cmd.Run()
 	if err != nil {
 		log.Println("Job Failed: job_id:", j.ID, err)
 	}
+
 	fmt.Print(out.String())
 }
 
 func main() {
-	jobDir := "./job"   // TODO: flag for jobDir
-	execDir := ".gflow" // TODO: flag for execDir
-	jobs := []*Job{
+	var (
+		jobDir  string
+		execDir string
+	)
+
+	flag.StringVar(&jobDir, "jobdir", "", "directory for job to exist")
+	flag.StringVar(&execDir, "execdir", ".gflow", "place to stick gflow files")
+
+	flag.Parse()
+
+	if jobDir == "" {
+		fmt.Println("jobdir not specified")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	wf := Workflow{[]*Job{
 		newJob(jobDir, execDir, `sleep 5`),
 		newJob(jobDir, execDir, `sleep 10`),
 		newJob(jobDir, execDir, `sleep 15`),
@@ -159,16 +197,6 @@ sed -re's/(w)(e)f/\2\1/'
 		newJob(jobDir, execDir, `ls -la`),
 		newJob(jobDir, execDir, `pwd`),
 		newJob(jobDir, execDir, `exit 1`),
-	}
-
-	wg := &sync.WaitGroup{}
-
-	for _, j := range jobs {
-		j.initJob()
-		fmt.Printf("%s\n", j.toJson())
-		wg.Add(1)
-		go j.runJob(wg)
-	}
-
-	wg.Wait()
+	}}
+	wf.Run()
 }
