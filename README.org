@@ -1,0 +1,8 @@
+*** Gflow
+My idea of a workflow manager implemented in go
+API subject to change
+
+*** Building the project
+#+BEGIN_SRC
+make
+#+END_SRC
