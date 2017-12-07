@@ -1,202 +1,37 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
 	"os"
-	"os/exec"
-	"path"
-	"path/filepath"
-	"strconv"
-	"sync"
-	"text/template"
 )
-
-var jState JobState
-
-func init() {
-	jState = JobState{0, &sync.Mutex{}}
-}
-
-type JobState struct {
-	ID    int
-	mutex *sync.Mutex
-}
-
-type Workflow struct {
-	jobs []*Job
-}
-
-func (w *Workflow) InitFlags() {
-	// TODO: add flag parsing here
-}
-
-func (w *Workflow) Run() {
-	wg := &sync.WaitGroup{}
-
-	for _, j := range w.jobs {
-		j.initJob()
-		fmt.Printf("%s\n", j.toJson())
-		wg.Add(1)
-		go j.runJob(wg)
-	}
-
-	wg.Wait()
-}
-
-func (j *JobState) increment() int {
-	j.mutex.Lock()
-	j.ID += 1
-	j.mutex.Unlock()
-	return j.ID
-}
-
-type Job struct {
-	ID          int      `json:"id"`
-	Directories []string `json:"directories"`
-	JobDir      string   `json:"job_dir"`
-	ExecDir     string   `json:"exec_dir"`
-	Cmd         string   `json:"cmd"`
-}
-
-func templateExecutable(body string) string {
-	shell := "/bin/bash"
-	preamble := "set -eo pipefail"
-	exeTemplate, err := template.New("exe").Parse("#!{{.Shell}}\n{{.Body}}\n") // TODO: if not endswith \n
-	if err != nil {
-		log.Fatal(err)
-	}
-	templateResult := bytes.Buffer{}
-	err = exeTemplate.Execute(&templateResult, struct {
-		Shell    string
-		Body     string
-		Preamble string
-	}{shell, body, preamble})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return templateResult.String()
-}
-
-func newJob(jobDir, scriptDir, cmd string) *Job {
-	jobId := jState.increment()
-
-	absJobDir, err := filepath.Abs(jobDir)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	execDir := path.Join(absJobDir, scriptDir, strconv.Itoa(jobId))
-
-	return &Job{jobId, []string{}, jobDir, execDir, templateExecutable(cmd)}
-}
-
-func (j *Job) initJob() {
-	j.createJobDir()
-	j.writeCommandScript()
-	j.createDirectories()
-}
-
-func (j *Job) createDirectories() {
-	for _, d := range j.Directories {
-		fmt.Println("creating: ", d)
-		err := os.MkdirAll(d, 0755)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-}
-
-func (j *Job) createJobDir() {
-	// TODO: where do responsibilities stop?
-	// _, err := os.Stat(j.JobDir)
-	// if err != nil {
-	// 	if os.IsNotExist(err) {
-	// 		err = os.Mkdir(j.JobDir, 0775)
-	// 		if err != nil {
-	// 			log.Fatal(err)
-	// 		}
-	// 		return
-	// 	}
-	// 	log.Fatal(err)
-	// }
-
-	err := os.MkdirAll(j.JobDir, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = os.MkdirAll(j.ExecDir, 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (j *Job) writeCommandScript() {
-	err := ioutil.WriteFile(path.Join(j.ExecDir, "exe"), []byte(j.Cmd), 0755)
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (j *Job) toJson() []byte {
-	rawJson, err := json.MarshalIndent(j, "", "  ")
-	if err != nil {
-		log.Fatal(err)
-	}
-	return rawJson
-}
-
-func (j *Job) runJob(wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	cmd := exec.Command(path.Join(j.ExecDir, "exe"))
-
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Dir = j.JobDir
-
-	err := cmd.Run()
-	if err != nil {
-		log.Println("Job Failed: job_id:", j.ID, err)
-	}
-
-	fmt.Print(out.String())
-}
 
 func main() {
 	var (
-		jobDir  string
-		execDir string
+		workflowDir string
 	)
 
-	flag.StringVar(&jobDir, "jobdir", "", "directory for job to exist")
-	flag.StringVar(&execDir, "execdir", ".gflow", "place to stick gflow files")
+	flag.StringVar(&workflowDir, "wfdir", "", "directory for job to exist")
 
 	flag.Parse()
 
-	if jobDir == "" {
-		fmt.Println("jobdir not specified")
+	if workflowDir == "" {
+		fmt.Println("wfdir not specified")
 		flag.Usage()
 		os.Exit(2)
 	}
 
-	wf := Workflow{[]*Job{
-		newJob(jobDir, execDir, `sleep 5`),
-		newJob(jobDir, execDir, `sleep 10`),
-		newJob(jobDir, execDir, `sleep 15`),
-		newJob(jobDir, execDir, `
-echo wef | \
-sed -re's/(w)(e)f/\2\1/'
-`),
-		newJob(jobDir, execDir, `echo bef`),
-		newJob(jobDir, execDir, `echo lef`),
-		newJob(jobDir, execDir, `ls -la`),
-		newJob(jobDir, execDir, `pwd`),
-		newJob(jobDir, execDir, `exit 1`),
-	}}
-	wf.Run()
+	wf := newWorkflow(workflowDir)
+
+	AddJob(wf, `sleep 3`)
+	AddJob(wf, `sleep 6`)
+	AddJob(wf, `sleep 8`)
+	AddJob(wf, `echo wef | sed -re's/(w)(e)f/\2\1/'`)
+	AddJob(wf, `echo bef`)
+	AddJob(wf, `echo lef`)
+	AddJob(wf, `ls -la`)
+	AddJob(wf, `pwd`)
+	AddJob(wf, `exit 1`)
+
+	os.Exit(wf.Run())
 }
