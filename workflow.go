@@ -39,6 +39,10 @@ func (w *Workflow) initWorkflow() {
 	w.createWorkflowDirs()
 }
 
+func (wf *Workflow) AddJob(j *Job) {
+	wf.Jobs = append(wf.Jobs, j)
+}
+
 func (w *Workflow) createWorkflowDirs() {
 	// TODO: where do responsibilities stop?
 	// _, err := os.Stat(w.WorkflowDir)
@@ -94,20 +98,27 @@ func (w *Workflow) writeWorkflowJson() {
 	if enc.Encode(w); err != nil {
 		log.Fatal(err)
 	}
-	// io.Copy(f, )
 }
 
 func (w *Workflow) Run() int {
 	wg := &sync.WaitGroup{}
 
-	// fmt.Printf("%s\n", w.toJson())
 	for _, j := range w.Jobs {
-		j.initJob()
+		err := j.initJob()
+		if err != nil {
+			log.Fatal("Failed initializing job_id:%d", j.ID)
+		}
 		wg.Add(1)
 		go j.runJob(wg)
 	}
 
-	w.writeWorkflowJson()
 	wg.Wait()
-	return w.inferExitStatus()
+	w.writeWorkflowJson()
+	exitStatus := w.inferExitStatus()
+	if exitStatus != 0 {
+		log.Printf("Workflow failed: exit status: %d", exitStatus)
+		return exitStatus
+	}
+	log.Printf("Workflow success")
+	return exitStatus
 }
