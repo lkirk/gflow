@@ -31,4 +31,42 @@ func TestRunWorkflow(t *testing.T) {
 			fmt.Println(wf.WorkflowDir)
 		})
 	}
+
+	deps := []string{"e", "f", "g", "h"}
+	replace := []string{"hello", "this", "is", "the"}
+
+	tmpDir := "test/job/tmp"
+	for i, s := range samples {
+
+		sampleTmp := path.Join(tmpDir, s)
+
+		tmpFile, _ := filepath.Abs(path.Join(sampleTmp, s))
+		depTmp, _ := filepath.Abs(path.Join(sampleTmp, deps[i]))
+
+		sampleCmd := fmt.Sprintf(
+			`echo "hello this is the world speaking" > %s && sleep %g`,
+			tmpFile, randomMilliseconds(1, 5000))
+
+		depCmd := fmt.Sprintf(`sed -e's| %s||g' %s > %s`,
+			replace[i], tmpFile, depTmp)
+
+		depJob := newJob(
+			wf,
+			[]string{sampleTmp},
+			[]*Job{},
+			[]string{depTmp},
+			false,
+			depCmd,
+		)
+
+		j := newJob(
+			wf,
+			[]string{sampleTmp},
+			[]*Job{depJob},
+			[]string{tmpFile},
+			false,
+			sampleCmd,
+		)
+		wf.AddJob(j)
+	}
 }
