@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	// "path/filepath"
 	"testing"
 )
 
@@ -32,41 +33,41 @@ func TestRunWorkflow(t *testing.T) {
 		})
 	}
 
-	deps := []string{"e", "f", "g", "h"}
-	replace := []string{"hello", "this", "is", "the"}
+	// deps := []string{"e", "f", "g", "h"}
+	// replace := []string{"hello", "this", "is", "the"}
 
-	tmpDir := "test/job/tmp"
-	for i, s := range samples {
+	// tmpDir := "test/job/tmp"
+	// for i, s := range []string{"a", "b", "c", "d", "e", "f", "g"} {
 
-		sampleTmp := path.Join(tmpDir, s)
+	// 	sampleTmp := path.Join(tmpDir, s)
 
-		tmpFile, _ := filepath.Abs(path.Join(sampleTmp, s))
-		depTmp, _ := filepath.Abs(path.Join(sampleTmp, deps[i]))
+	// 	tmpFile, _ := filepath.Abs(path.Join(sampleTmp, s))
+	// 	depTmp, _ := filepath.Abs(path.Join(sampleTmp, deps[i]))
 
-		sampleCmd := fmt.Sprintf(
-			`echo "hello this is the world speaking" > %s && sleep %g`,
-			tmpFile, randomMilliseconds(1, 5000))
+	// 	sampleCmd := fmt.Sprintf(
+	// 		`echo "hello this is the world speaking" > %s && sleep %g`,
+	// 		tmpFile, randomMilliseconds(1, 5000))
 
-		depCmd := fmt.Sprintf(`sed -e's| %s||g' %s > %s`,
-			replace[i], tmpFile, depTmp)
+	// 	depCmd := fmt.Sprintf(`sed -e's| %s||g' %s > %s`,
+	// 		replace[i], tmpFile, depTmp)
 
-		depJob := newJob(
-			wf,
-			[]string{sampleTmp},
-			[]*Job{},
-			[]string{depTmp},
-			false,
-			depCmd,
-		)
+	// 	depJob := newJob(
+	// 		wf,
+	// 		[]string{sampleTmp},
+	// 		[]*Job{},
+	// 		[]string{depTmp},
+	// 		false,
+	// 		depCmd,
+	// 	)
 
-		j := newJob(
-			wf,
-			[]string{sampleTmp},
-			[]*Job{depJob},
-			[]string{tmpFile},
-			false,
-			sampleCmd,
-		)
-		wf.AddJob(j)
-	}
+	// 	j := newJob(
+	// 		wf,
+	// 		[]string{sampleTmp},
+	// 		[]*Job{depJob},
+	// 		[]string{tmpFile},
+	// 		false,
+	// 		sampleCmd,
+	// 	)
+	// 	wf.AddJob(j)
+	// }
 }
