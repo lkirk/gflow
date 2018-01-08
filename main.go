@@ -63,6 +63,7 @@ func main() {
 			`echo "hello this is the world speaking" > %s && sleep %g`,
 			tmpFile, randomMilliseconds(1, 5000))
 
+		// TODO: Implement outputs
 		depCmd := fmt.Sprintf(`sed -e's|%s||g' %s > %s`,
 			replace[i], tmpFile, depTmp)
 
@@ -80,7 +81,7 @@ func main() {
 			[]string{sampleTmp},
 			[]*Job{depJob},
 			[]string{tmpFile},
-			false,
+			true,
 			sampleCmd,
 		)
 		wf.AddJob(j)
