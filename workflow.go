@@ -19,6 +19,7 @@ type Workflow struct {
 	WorkflowDir string `json:"workflow_dir"`
 	LogDir      string `json:"log_dir"`
 	ExecDir     string `json:"exec_dir"`
+	TmpDir      string `json:"tmp_dir"`
 	Jobs        []*Job `json:"jobs"`
 	JobsFailed  int    `json:"jobs_failed"`
 }
@@ -70,10 +71,11 @@ func newWorkflow(wfDir string) *Workflow {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logDir := path.Join(absWfDir, "log")
-	execDir := path.Join(absWfDir, ".gflow")
+	logDir := path.Join(absWfDir, ".gflow", "log")
+	execDir := path.Join(absWfDir, ".gflow", "exec")
+	tmpDir := path.Join(absWfDir, ".gflow", "tmp")
 
-	wf := &Workflow{absWfDir, logDir, execDir, []*Job{}, 0}
+	wf := &Workflow{absWfDir, logDir, execDir, tmpDir, []*Job{}, 0}
 	wf.createWorkflowDirs()
 	return wf
 }

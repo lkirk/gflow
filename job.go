@@ -41,7 +41,9 @@ type Job struct {
 
 func newJob(wf *Workflow, dirs []string, deps []*Job, produces []string, clean bool, cmd string) *Job {
 	jobId := jState.increment()
-	return &Job{wf, jobId, dirs, deps, produces, clean, templateExecutable(cmd)}
+	job := &Job{wf, jobId, dirs, deps, produces, clean, cmd}
+	job.Cmd = templateExecutable(job.Cmd, job.pathToTmp(), job.CleanTmp)
+	return job
 }
 
 func (j *Job) initJob() error {
@@ -56,13 +58,18 @@ func (j *Job) AddDependency(deps ...*Job) {
 }
 
 func (j *Job) pathToExec(s ...string) string {
-	jobExec := []string{j.workflow.ExecDir, "jobs", strconv.Itoa(j.ID)}
-	return path.Join(append(jobExec, s...)...)
+	jobExecDir := []string{j.workflow.ExecDir, "jobs", strconv.Itoa(j.ID)}
+	return path.Join(append(jobExecDir, s...)...)
 }
 
 func (j *Job) pathToLog(s ...string) string {
-	jobLog := []string{j.workflow.LogDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobLog, s...)...)
+	jobLogDir := []string{j.workflow.LogDir, strconv.Itoa(j.ID)}
+	return path.Join(append(jobLogDir, s...)...)
+}
+
+func (j *Job) pathToTmp(s ...string) string {
+	jobTmpDir := []string{j.workflow.TmpDir, strconv.Itoa(j.ID)}
+	return path.Join(append(jobTmpDir, s...)...)
 }
 
 func (j *Job) pathToOutLog() string {
@@ -74,7 +81,7 @@ func (j *Job) pathToErrLog() string {
 }
 
 func (j *Job) createJobDirs() {
-	for _, d := range []string{j.pathToLog(), j.pathToExec()} {
+	for _, d := range []string{j.pathToLog(), j.pathToExec(), j.pathToTmp()} {
 		err := os.MkdirAll(d, 0755)
 		if err != nil {
 			log.Fatal(err)
@@ -98,7 +105,6 @@ func (j *Job) createDirectories() (err error) {
 				return err
 			}
 		}
-
 	}
 	return
 }
