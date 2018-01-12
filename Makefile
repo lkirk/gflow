@@ -9,6 +9,11 @@ gflow:=$(WD)/gflow
 
 go-build: $(gflow)
 
+.PHONY: test
+TEST_OPTS:=
+test:
+	go test ./... $(TEST_OPTS)
+
 ## always build on make
 .PHONY: $(gflow)
 $(gflow):
