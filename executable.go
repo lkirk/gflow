@@ -9,6 +9,9 @@ import (
 )
 
 func templateCleanTmpTrap(tmpDir string) (error, string) {
+	if tmpDir == "" {
+		return errors.New("Error: tried to create cleanup, no tmpdir"), ""
+	}
 	// uses bash specific logic (pseudosignal EXIT)
 	t := `
 	function cleanTmp {
