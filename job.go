@@ -10,38 +10,20 @@ import (
 	"sync"
 )
 
-var jState JobState
-
-func init() {
-	jState = JobState{0, &sync.Mutex{}}
-}
-
-type JobState struct {
-	ID    int
-	mutex *sync.Mutex
-}
-
-func (j *JobState) increment() int {
-	j.mutex.Lock()
-	j.ID += 1
-	j.mutex.Unlock()
-	return j.ID
-}
-
 type Job struct {
 	workflow *Workflow
 
 	ID           int      `json:"id"`
 	Directories  []string `json:"directories"`
 	Dependencies []*Job   `json:"dependencies"`
-	Produces     []string `json:"produces"`
+	Outputs      []string `json:"outputs"`
 	CleanTmp     bool     `json:"clean_tmp"`
 	Cmd          string   `json:"cmd"`
 }
 
-func newJob(wf *Workflow, dirs []string, deps []*Job, produces []string, clean bool, cmd string) *Job {
-	jobId := jState.increment()
-	job := &Job{wf, jobId, dirs, deps, produces, clean, cmd}
+func newJob(wf *Workflow, dirs []string, deps []*Job, outputs []string, clean bool, cmd string) *Job {
+	jobId := wf.incrementCurrentJobId()
+	job := &Job{wf, jobId, dirs, deps, outputs, clean, cmd}
 	job.Cmd = templateExecutable(job.Cmd, job.pathToTmp(), job.CleanTmp)
 	return job
 }
@@ -58,7 +40,7 @@ func (j *Job) AddDependency(deps ...*Job) {
 }
 
 func (j *Job) pathToExec(s ...string) string {
-	jobExecDir := []string{j.workflow.ExecDir, "jobs", strconv.Itoa(j.ID)}
+	jobExecDir := []string{j.workflow.ExecDir, strconv.Itoa(j.ID)}
 	return path.Join(append(jobExecDir, s...)...)
 }
 
@@ -91,6 +73,7 @@ func (j *Job) createJobDirs() {
 
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
+		d = path.Join(j.workflow.WorkflowDir, d)
 		exists, err := Exists(d)
 		switch {
 		case err != nil:
@@ -128,27 +111,41 @@ func (j *Job) openLogs() (outLog, errLog *os.File, err error) {
 	return outLog, errLog, nil
 }
 
-func (j *Job) checkProduces() bool {
-	if len(j.Produces) == 0 {
+func (j *Job) checkOutputs() bool {
+	if len(j.Outputs) == 0 {
 		return false
 	}
-	for _, f := range j.Produces {
+	for _, f := range j.Outputs {
 		exists, err := Exists(f)
 		if err != nil {
 			log.Printf("Failed to stat file '%s' job_id:%d error:'%s'", f, j.ID, err.Error())
-			j.workflow.JobsFailed += 1 // TODO: thread safe?
-			return exists
+			return false
 		}
-		if !exists {
-			return exists
-		}
+		return exists
 	}
 	return true
 }
 
+type failedJobs struct {
+	jobs  []*Job
+	mutex *sync.Mutex
+}
+
+func newFailedJobs() *failedJobs {
+	fj := &failedJobs{}
+	fj.mutex = &sync.Mutex{}
+	return fj
+}
+
+func (fj *failedJobs) add(job *Job) {
+	fj.mutex.Lock()
+	fj.jobs = append(fj.jobs, job)
+	fj.mutex.Unlock()
+}
+
 func (j *Job) runJob(wg *sync.WaitGroup) {
 	defer wg.Done()
-	if j.checkProduces() {
+	if j.checkOutputs() {
 		return
 	}
 
@@ -168,12 +165,16 @@ func (j *Job) runJob(wg *sync.WaitGroup) {
 	cmd.Dir = j.workflow.WorkflowDir
 
 	err = cmd.Run()
-	if err != nil {
+	switch {
+	case err == nil:
+		log.Println("Job Succeeded: job_id:", j.ID)
+	case j.checkOutputs() == false:
+		log.Println("Job Failed: outputs do not exist: job_id:", j.ID, err)
+		j.workflow.failedJobs.add(j)
+	default:
 		log.Println("Job Failed: job_id:", j.ID, err)
-		j.workflow.JobsFailed += 1 // TODO: thread safe?
+		j.workflow.failedJobs.add(j)
 	}
-
-	log.Println("Job Succeeded: job_id:", j.ID)
 
 	for _, d := range j.Dependencies {
 		d.initJob()
