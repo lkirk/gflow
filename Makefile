@@ -23,6 +23,7 @@ $(gflow):
 .PHONY: clean
 clean:
 	rm -f $(gflow)
+	rm -rf $(WD)/testoutput
 
 ## release
 RELEASE-INCREMENTS:=major minor patch
