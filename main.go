@@ -24,7 +24,7 @@ func main() {
 	flag.Parse()
 
 	if workflowDir == "" {
-		fmt.Println("wfdir not specified")
+		fmt.Println("Error: wfdir not specified")
 		flag.Usage()
 		os.Exit(2)
 	}
