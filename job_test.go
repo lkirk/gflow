@@ -37,25 +37,6 @@ func expectNonZero(t *testing.T, status int) {
 	}
 }
 
-func TestWorkflowFailure(t *testing.T) {
-	defer cleanTestData(t)
-	wf := newWorkflow(path.Join(OutputDir, "testJobFailure"))
-	wf.AddJob(
-		newJob(wf, []string{}, []*Job{}, []string{}, false, "echo hello"),
-		newJob(wf, []string{}, []*Job{}, []string{}, false, "echo error failure >2; false"),
-	)
-	expectNonZero(t, wf.Run())
-}
-
-func TestWorkflowSuccess(t *testing.T) {
-	defer cleanTestData(t)
-	wf := newWorkflow(path.Join(OutputDir, "testJobFailure"))
-	wf.AddJob(
-		newJob(wf, []string{}, []*Job{}, []string{}, false, "echo hello"),
-	)
-	expectZero(t, wf.Run())
-}
-
 func TestRunWorkflow(t *testing.T) {
 	testCases := []struct {
 		name string
