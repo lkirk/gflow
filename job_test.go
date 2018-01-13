@@ -64,10 +64,9 @@ func TestRunWorkflow(t *testing.T) {
 			}
 		}},
 		{"DependentJobs", func(wf *Workflow) []*Job {
-			j := newJob(wf, []string{"out"},
+			return []*Job{newJob(wf, []string{"out"},
 				[]*Job{newJob(wf, []string{"out"}, []*Job{}, []string{"out/test_out.txt"}, true, "grep -o some out/test_a.txt > out/test_out.txt")},
-				[]string{}, true, "echo 'some test output' > out/test_a.txt")
-			return []*Job{j}
+				[]string{}, true, "echo 'some test output' > out/test_a.txt")}
 		}},
 	}
 	for _, tc := range testCases {
