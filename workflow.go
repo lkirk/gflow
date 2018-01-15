@@ -12,9 +12,14 @@ import (
 )
 
 const (
-	ExitJobsFailed int = 1 + iota // One or more jobs failed
+	// ExitJobsFailed indicates that one or more jobs failed
+	ExitJobsFailed int = 1 + iota
 )
 
+// The Workflow type abstracts the entrypoint of a given workflow
+// It manages jobs, both launching them and waiting for them to finish
+// When jobs fail, it infers the errors and returns a nonzero exit status
+// A Workflow dir will contain logs, scripts, and the PATH of the process
 type Workflow struct {
 	WorkflowDir string `json:"workflow_dir"`
 	LogDir      string `json:"log_dir"`
@@ -23,25 +28,26 @@ type Workflow struct {
 	WFJsonPath  string `json:"wf_json_path"`
 	Jobs        []*Job `json:"jobs"`
 
-	currentJobId int
-	jobIdLock    *sync.Mutex
+	currentJobID int
+	JobIDLock    *sync.Mutex
 	failedJobs   *failedJobs
 }
 
-func (w *Workflow) InitFlags() {
-	// TODO: add flag parsing here
-}
+// func (w *Workflow) InitFlags() {
+// 	// TODO: add flag parsing here
+// }
 
 func (w *Workflow) initWorkflow() {
 	w.createWorkflowDirs()
 }
 
-func (wf *Workflow) AddJob(j ...*Job) {
-	wf.Jobs = append(wf.Jobs, j...)
+// AddJob adds a job or list of jobs to a workflow
+func (w *Workflow) AddJob(j ...*Job) {
+	w.Jobs = append(w.Jobs, j...)
 }
 
-func (wf *Workflow) pathToWFDir(s ...string) string {
-	return path.Join(append([]string{wf.WorkflowDir}, s...)...)
+func (w *Workflow) pathToWDir(s ...string) string {
+	return path.Join(append([]string{w.WorkflowDir}, s...)...)
 }
 
 func (w *Workflow) createWorkflowDirs() {
@@ -66,11 +72,11 @@ func (w *Workflow) createWorkflowDirs() {
 	}
 }
 
-func (w *Workflow) incrementCurrentJobId() int {
-	w.jobIdLock.Lock()
-	w.currentJobId += 1
-	w.jobIdLock.Unlock()
-	return w.currentJobId
+func (w *Workflow) incrementCurrentJobID() int {
+	w.JobIDLock.Lock()
+	w.currentJobID++
+	w.JobIDLock.Unlock()
+	return w.currentJobID
 }
 
 func newWorkflow(wfDir string) *Workflow {
@@ -81,10 +87,10 @@ func newWorkflow(wfDir string) *Workflow {
 	logDir := path.Join(absWfDir, ".gflow", "log")
 	execDir := path.Join(absWfDir, ".gflow", "exec")
 	tmpDir := path.Join(absWfDir, ".gflow", "tmp")
-	wfJsonPath := path.Join(absWfDir, ".gflow", "wf.json")
+	wfJSONPath := path.Join(absWfDir, ".gflow", "wf.json")
 
 	wf := &Workflow{
-		absWfDir, logDir, execDir, tmpDir, wfJsonPath,
+		absWfDir, logDir, execDir, tmpDir, wfJSONPath,
 		[]*Job{}, 0, &sync.Mutex{}, newFailedJobs(),
 	}
 	wf.createWorkflowDirs()
@@ -100,7 +106,7 @@ func (w *Workflow) inferExitStatus() int {
 	return 0
 }
 
-func (w *Workflow) writeWorkflowJson() {
+func (w *Workflow) writeWorkflowJSON() {
 	f, err := os.Create(w.WFJsonPath)
 	if err != nil {
 		log.Fatal(err)
@@ -113,6 +119,10 @@ func (w *Workflow) writeWorkflowJson() {
 	}
 }
 
+// Run runs the workflow, which has a dependency tree of jobs
+// Run initializes each job in order of dependency, then executes
+// each job until everything returns. The exit status is then inferred,
+// and the workflow JSON file is written to the filesystem.
 func (w *Workflow) Run() int {
 	w.initWorkflow()
 	wg := &sync.WaitGroup{}
@@ -127,7 +137,7 @@ func (w *Workflow) Run() int {
 	}
 
 	wg.Wait()
-	w.writeWorkflowJson()
+	w.writeWorkflowJSON()
 	exitStatus := w.inferExitStatus()
 	if exitStatus != 0 {
 		log.Printf("Workflow failed: exit status: %d", exitStatus)
