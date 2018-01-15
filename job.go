@@ -10,6 +10,10 @@ import (
 	"sync"
 )
 
+// The Job type abstracts the execution of an executable.
+// A bash script is written to the filesystem for execution
+// the process is waited on to return, then dependent jobs are run.
+// If a job fails, dependent jobs will not execute
 type Job struct {
 	workflow *Workflow
 
@@ -22,9 +26,9 @@ type Job struct {
 }
 
 func newJob(wf *Workflow, dirs []string, deps []*Job, outputs []string, clean bool, cmd string) *Job {
-	jobId := wf.incrementCurrentJobId()
-	job := &Job{wf, jobId, dirs, deps, outputs, clean, cmd}
-	job.Cmd = templateExecutable(job.Cmd, job.pathToTmp(), job.CleanTmp)
+	JobID := wf.incrementCurrentJobID()
+	job := &Job{wf, JobID, dirs, deps, outputs, clean, cmd}
+	job.Cmd = templateExecutable(job)
 	return job
 }
 
@@ -35,6 +39,7 @@ func (j *Job) initJob() error {
 	return err
 }
 
+// AddDependency adds a job dependency the current job instance
 func (j *Job) AddDependency(deps ...*Job) {
 	j.Dependencies = append(j.Dependencies, deps...)
 }
@@ -71,10 +76,18 @@ func (j *Job) createJobDirs() {
 	}
 }
 
+func fileExists(path string) (exists bool, err error) {
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return err == nil, nil
+}
+
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
 		d = path.Join(j.workflow.WorkflowDir, d)
-		exists, err := Exists(d)
+		exists, err := fileExists(d)
 		switch {
 		case err != nil:
 			log.Printf("Failed to stat dir '%s' job_id:%d error:'%s'", d, j.ID, err.Error())
@@ -116,7 +129,7 @@ func (j *Job) checkOutputs() bool {
 		return false
 	}
 	for _, f := range j.Outputs {
-		exists, err := Exists(f)
+		exists, err := fileExists(f)
 		if err != nil {
 			log.Printf("Failed to stat file '%s' job_id:%d error:'%s'", f, j.ID, err.Error())
 			return false
