@@ -14,6 +14,20 @@ TEST_OPTS:=
 test:
 	go test ./... $(TEST_OPTS)
 
+.PHONY: test
+LINT_OPTS:=
+lint:
+	golint $(LINT_OPTS)
+
+dev:
+	$(MAKE) test lint
+
+.PHONY: coverage-report
+COVERAGE_REPORT_OPTS:=
+coverage-report:
+	make test TEST_OPTS+=-coverprofile=coverage.out
+	go tool cover -html=coverage.out
+
 ## always build on make
 .PHONY: $(gflow)
 $(gflow):
