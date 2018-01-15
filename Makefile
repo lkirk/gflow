@@ -4,6 +4,8 @@ DEFAULT_GOAL: go-build
 
 WD:=$(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 SHELL:=/bin/bash -eo pipefail
+SUB_MAKE_OPTS:=--no-print-directory
+MAKE+=$(SUB_MAKE_OPTS)
 
 gflow:=$(WD)/gflow
 
@@ -20,14 +22,15 @@ lint:
 	golint $(LINT_OPTS)
 
 dev:
-	$(MAKE) test lint
+	$(MAKE) test lint TEST_OPTS+='-v -race'
 	go vet
 
 .PHONY: coverage-report
 COVERAGE_REPORT_OPTS:=
+_COVERAGE_REPORT:=coverage.out
 coverage-report:
-	make test TEST_OPTS+=-coverprofile=coverage.out
-	go tool cover -html=coverage.out
+	$(MAKE) test TEST_OPTS+=-coverprofile=$(_COVERAGE_REPORT)
+	go tool cover -html=$(_COVERAGE_REPORT)
 
 ## always build on make
 .PHONY: $(gflow)
@@ -37,6 +40,7 @@ $(gflow):
 ## remove binary
 .PHONY: clean
 clean:
+	rm -f $(_COVERAGE_REPORT)
 	rm -f $(gflow)
 	rm -rf $(WD)/testoutput
 
