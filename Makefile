@@ -21,6 +21,7 @@ lint:
 
 dev:
 	$(MAKE) test lint
+	go vet
 
 .PHONY: coverage-report
 COVERAGE_REPORT_OPTS:=
