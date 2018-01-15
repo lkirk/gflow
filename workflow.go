@@ -130,7 +130,7 @@ func (w *Workflow) Run() int {
 	for _, j := range w.Jobs {
 		err := j.initJob()
 		if err != nil {
-			log.Fatal("Failed initializing job_id: %d", j.ID)
+			log.Fatalf("Failed initializing job_id: %d", j.ID)
 		}
 		wg.Add(1)
 		go j.runJob(wg)
