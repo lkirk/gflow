@@ -8,9 +8,9 @@ import (
 	"text/template"
 )
 
-func templateCleanTmpTrap(tmpDir string) (error, string) {
+func templateCleanTmpTrap(tmpDir string) (string, error) {
 	if tmpDir == "" {
-		return errors.New("Error: tried to create cleanup, no tmpdir"), ""
+		return "", errors.New("Error: tried to create cleanup, no tmpdir")
 	}
 	// uses bash specific logic (pseudosignal EXIT)
 	t := `
@@ -25,25 +25,42 @@ func templateCleanTmpTrap(tmpDir string) (error, string) {
 	t = strings.Replace(t, "\t", "", -1) // remove leading tabs
 	cleanTmpTemplate, err := template.New("cleanTmp").Parse(t)
 	if err != nil {
-		return err, ""
+		return "", err
 	}
 
 	templateResult := bytes.Buffer{}
 	err = cleanTmpTemplate.Execute(&templateResult, struct{ TmpDir string }{tmpDir})
 	if err != nil {
-		return err, ""
+		return "", err
 	}
-	return err, templateResult.String()
+	return templateResult.String(), err
 }
 
-func templateExecutable(body, tmpDir string, cleanTmp bool) string {
+func templateBody(j *Job) (string, error) {
+	bodyTemplate, err := template.New("bodyTemplate").Parse(j.Cmd)
+	if err != nil {
+		return "", err
+	}
+
+	templateResult := bytes.Buffer{}
+	err = bodyTemplate.Execute(&templateResult, struct {
+		Job    *Job
+		TmpDir string
+	}{j, j.pathToTmp()})
+	if err != nil {
+		return "", err
+	}
+	return templateResult.String(), err
+}
+
+func templateExecutable(j *Job) string {
 	shell := "/bin/bash"
 	preamble := "set -eo pipefail"
 
 	traps := ""
 	err := errors.New("")
-	if cleanTmp {
-		err, traps = templateCleanTmpTrap(tmpDir)
+	if j.CleanTmp {
+		traps, err = templateCleanTmpTrap(j.pathToTmp())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -52,6 +69,10 @@ func templateExecutable(body, tmpDir string, cleanTmp bool) string {
 	scriptText := "#!{{.Shell}}\n{{.Preamble}}\n{{.Traps}}\n{{.Body}}\n"
 
 	exeTemplate, err := template.New("exe").Parse(scriptText) // TODO: if not endswith \n
+	if err != nil {
+		log.Fatal(err)
+	}
+	body, err := templateBody(j)
 	if err != nil {
 		log.Fatal(err)
 	}
