@@ -3,12 +3,15 @@ package main
 import (
 	"encoding/json"
 	// "fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path"
 	"path/filepath"
 	"strconv"
 	"sync"
+
+	"github.com/ghodss/yaml"
 )
 
 const (
@@ -29,7 +32,7 @@ type Workflow struct {
 	Jobs        []*Job `json:"jobs"`
 
 	currentJobID int
-	JobIDLock    *sync.Mutex
+	jobIDLock    *sync.Mutex
 	failedJobs   *failedJobs
 }
 
@@ -73,9 +76,9 @@ func (w *Workflow) createWorkflowDirs() {
 }
 
 func (w *Workflow) incrementCurrentJobID() int {
-	w.JobIDLock.Lock()
+	w.jobIDLock.Lock()
 	w.currentJobID++
-	w.JobIDLock.Unlock()
+	w.jobIDLock.Unlock()
 	return w.currentJobID
 }
 
@@ -145,4 +148,33 @@ func (w *Workflow) Run() int {
 	}
 	log.Printf("Workflow success")
 	return exitStatus
+}
+
+func addWorkflowBackref(w *Workflow, jobs []*Job) {
+	for _, j := range jobs {
+		j.workflow = w
+		addWorkflowBackref(w, j.Dependencies)
+	}
+}
+
+func workflowFromYaml(yamlPath string) *Workflow {
+	yamlBytes, err := ioutil.ReadFile(yamlPath)
+	if err != nil {
+		log.Fatalf("Error reading workflow yaml: %v\n", err)
+	}
+	var w Workflow
+	err = yaml.Unmarshal(yamlBytes, &w)
+	if err != nil {
+		log.Fatalf("Error unmarshalling workflow: %v\n", err)
+	}
+	w.currentJobID = 0
+	w.jobIDLock = &sync.Mutex{}
+	w.failedJobs = newFailedJobs()
+	addWorkflowBackref(&w, w.Jobs)
+	return &w
+}
+
+func RunFromYaml(yamlPath string) int {
+	w := workflowFromYaml(yamlPath)
+	return w.Run()
 }
