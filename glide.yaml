@@ -1,0 +1,4 @@
+package: github.com/lloydkirk/gflow
+import:
+- package: github.com/ghodss/yaml
+  version: v1.0.0
