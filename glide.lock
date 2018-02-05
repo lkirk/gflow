@@ -1,6 +1,8 @@
-hash: 775cf2c1db91be7aaaa0d6548a257954564478ab925f36985ee168d3f9960762
-updated: 2018-01-30T07:17:40.125163027Z
+hash: 6b7ae54c7ee2351d1d4e36275bdbe03e79105493aa71ddff88cf431206378f2e
+updated: 2018-02-05T07:49:49.148543034Z
 imports:
+- name: github.com/dgruber/drmaa
+  version: 8f20cd174d2089892007035ae5d5338bc58d815b
 - name: github.com/ghodss/yaml
   version: 0ca9ea5df5451ffdf184b4428c902747c2c11cd7
 - name: gopkg.in/yaml.v2
