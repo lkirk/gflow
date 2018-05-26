@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"io/ioutil"
 	"log"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // The Job type abstracts the execution of an executable.
@@ -156,7 +158,12 @@ func (fj *failedJobs) add(job *Job) {
 	fj.mutex.Unlock()
 }
 
-func (j *Job) runJob(wg *sync.WaitGroup) {
+func newEventEntry(j *Job, startTime, endTime int64) EventFileEntry {
+	sum := sha256.Sum256([]byte(j.Cmd))
+	return EventFileEntry{JobID: j.ID, StartTime: startTime, EndTime: endTime, ArgHash: sum}
+}
+
+func (j *Job) runJob(wg *sync.WaitGroup, bwp *chanWriter) {
 	defer wg.Done()
 	if j.checkOutputs() {
 		return
@@ -177,10 +184,14 @@ func (j *Job) runJob(wg *sync.WaitGroup) {
 	cmd.Stderr = errLog
 	cmd.Dir = j.workflow.WorkflowDir
 
+	startTime := time.Now().UnixNano()
 	err = cmd.Run()
+	endTime := time.Now().UnixNano()
 	switch {
 	case err == nil:
 		log.Println("Job Succeeded: job_id:", j.ID)
+		efe := newEventEntry(j, startTime, endTime)
+		bwp.Write(efe)
 	case j.checkOutputs() == false:
 		log.Println("Job Failed: outputs do not exist: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
@@ -192,7 +203,7 @@ func (j *Job) runJob(wg *sync.WaitGroup) {
 	for _, d := range j.Dependencies {
 		d.initJob()
 		depWg.Add(1)
-		go d.runJob(wg)
+		go d.runJob(wg, bwp)
 	}
 	depWg.Wait()
 }
