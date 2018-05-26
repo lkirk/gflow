@@ -19,5 +19,5 @@ func main() {
 		os.Exit(2)
 	}
 
-	RunFromYaml(workflowYaml)
+	runFromYaml(workflowYaml)
 }

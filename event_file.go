@@ -5,16 +5,17 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"time"
 )
 
-// BackGroundPollMs is the rate (in ms) by which the BackgroundWriteProcess
+// BackGroundPollMs is the rate (in ms) by which the backgroundWriteProcess
 // will poll the channel to write to the event file log
 const BackGroundPollMs = 100
 
 // EventFileHeader specifies the fields that a record in the event file contains
-var EventFileHeader = []string{"job_id", "start_time_ns", "end_time_ns", "arg_hash"}
+// var EventFileHeader = []string{"job_id", "start_time_ns", "end_time_ns", "arg_hash"}
 
 // EventFileEntry describes a record to be written to the event file
 type EventFileEntry struct {
@@ -27,11 +28,14 @@ type EventFileEntry struct {
 func newEventFileWriter(iw io.Writer) *csv.Writer {
 	w := csv.NewWriter(iw)
 	w.Comma = '\t'
-	w.Write(EventFileHeader)
 	return w
 }
 
-func BackgroundWriteProcess(iw io.Writer) *chanWriter {
+func newEventFile(p string) (f *os.File, err error) {
+	return os.OpenFile(p, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+}
+
+func backgroundWriteProcess(iw io.Writer) *chanWriter {
 	writer := newChanWriter(iw)
 	go func() {
 		for {
@@ -65,15 +69,15 @@ func (w *chanWriter) Close() error {
 	return nil
 }
 
-func (cw *chanWriter) Write(efe EventFileEntry) error {
-	cw.writer.Write([]string{
+func (w *chanWriter) Write(efe EventFileEntry) error {
+	w.writer.Write([]string{
 		strconv.Itoa(efe.JobID),
 		strconv.FormatInt(efe.StartTime, 10),
 		strconv.FormatInt(efe.EndTime, 10),
 		fmt.Sprintf("%x", efe.ArgHash),
 	})
-	cw.writer.Flush()
-	if err := cw.writer.Error(); err != nil {
+	w.writer.Flush()
+	if err := w.writer.Error(); err != nil {
 		return err
 	}
 	return nil

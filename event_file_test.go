@@ -11,7 +11,7 @@ import (
 
 func TestEventFile(t *testing.T) {
 	b := bytes.Buffer{}
-	bwp := BackgroundWriteProcess(&b)
+	bwp := backgroundWriteProcess(&b)
 	defer bwp.Close()
 
 	command := "ls -la"
@@ -23,8 +23,6 @@ func TestEventFile(t *testing.T) {
 		"1de700c29687cae34561545f50d3c8b3d9afe88e04cc11069f8a6dc6e4ce9464"}, "\t")
 
 	expectedFileContents := bytes.Buffer{}
-	expectedFileContents.WriteString(strings.Join(EventFileHeader, "\t"))
-	expectedFileContents.WriteRune('\n')
 	expectedFileContents.WriteString(jobEntry)
 	expectedFileContents.WriteRune('\n')
 
