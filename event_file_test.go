@@ -28,7 +28,7 @@ func TestEventFile(t *testing.T) {
 	expectedFileContents.WriteString(jobEntry)
 	expectedFileContents.WriteRune('\n')
 
-	efe := EventFileEntry{JobId: 1, StartTime: startTime, EndTime: endtime, ArgHash: sum}
+	efe := EventFileEntry{JobID: 1, StartTime: startTime, EndTime: endtime, ArgHash: sum}
 	bwp.Write(efe)
 	if b.String() != expectedFileContents.String() {
 		t.Errorf("Unexpected test file contents:\nExpected:\n>>>%s<<<\nGot:\n>>>%s<<<\n",

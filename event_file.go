@@ -9,12 +9,16 @@ import (
 	"time"
 )
 
+// BackGroundPollMs is the rate (in ms) by which the BackgroundWriteProcess
+// will poll the channel to write to the event file log
 const BackGroundPollMs = 100
 
+// EventFileHeader specifies the fields that a record in the event file contains
 var EventFileHeader = []string{"job_id", "start_time_ns", "end_time_ns", "arg_hash"}
 
+// EventFileEntry describes a record to be written to the event file
 type EventFileEntry struct {
-	JobId     int
+	JobID     int
 	StartTime int64
 	EndTime   int64
 	ArgHash   [sha256.Size]byte
@@ -63,7 +67,7 @@ func (w *chanWriter) Close() error {
 
 func (cw *chanWriter) Write(efe EventFileEntry) error {
 	cw.writer.Write([]string{
-		strconv.Itoa(efe.JobId),
+		strconv.Itoa(efe.JobID),
 		strconv.FormatInt(efe.StartTime, 10),
 		strconv.FormatInt(efe.EndTime, 10),
 		fmt.Sprintf("%x", efe.ArgHash),
