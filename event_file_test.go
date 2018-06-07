@@ -3,10 +3,13 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/boltdb/bolt"
 )
 
 func TestEventFile(t *testing.T) {
@@ -32,4 +35,46 @@ func TestEventFile(t *testing.T) {
 		t.Errorf("Unexpected test file contents:\nExpected:\n>>>%s<<<\nGot:\n>>>%s<<<\n",
 			expectedFileContents.String(), b.String())
 	}
+}
+
+func setupEventFile() (db *bolt.DB, err error) {
+	db, err = bolt.Open("test.db", 0600, nil)
+	if err != nil {
+		err = fmt.Errorf("could not open event file: %s", err)
+		return
+	}
+	err = db.Update(func(tx *bolt.Tx) (err error) {
+		root, err := tx.CreateBucketIfNotExists([]byte("DB"))
+		if err != nil {
+			err = fmt.Errorf("could not create root bucket: %s", err)
+			return
+		}
+		_, err = root.CreateBucketIfNotExists([]byte("Job"))
+		if err != nil {
+			err = fmt.Errorf("could not create Job bucket: %s", err)
+			return
+		}
+		return
+	})
+	if err != nil {
+		err = fmt.Errorf("could not set up buckets: %s", err)
+		return
+	}
+	return
+}
+
+func addJob(db *bolt.DB, id int, arghash []byte) error {
+	return db.Update(func(tx *bolt.Tx) error {
+		b := tx.Bucket([]byte("DB")).Bucket([]byte("Job"))
+		return b.Put([]byte(id), arghash)
+	})
+}
+
+func TestBoltIntegration(t *testing.T) {
+	db, err := setupEventFile()
+	if err != nil {
+		t.Error(err)
+	}
+	defer db.Close()
+	addJob(db, 1, []byte("ohai"))
 }
