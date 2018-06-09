@@ -9,7 +9,9 @@ import (
 	"path"
 	"strconv"
 	"sync"
-	"time"
+	// "time"
+
+	"github.com/boltdb/bolt"
 )
 
 // The Job type abstracts the execution of an executable.
@@ -18,6 +20,9 @@ import (
 // If a job fails, dependent jobs will not execute
 type Job struct {
 	workflow *Workflow
+
+	// argHash  [sha256.Size]byte
+	argHash []byte
 
 	ID           int      `json:"id"`
 	Directories  []string `json:"directories"`
@@ -29,8 +34,11 @@ type Job struct {
 
 func newJob(wf *Workflow, dirs []string, deps []*Job, outputs []string, clean bool, cmd string) *Job {
 	JobID := wf.incrementCurrentJobID()
-	job := &Job{wf, JobID, dirs, deps, outputs, clean, cmd}
+	job := &Job{wf, []byte{}, JobID, dirs, deps, outputs, clean, cmd}
 	job.Cmd = templateExecutable(job)
+	rawHash := sha256.Sum256([]byte(job.Cmd))
+	argHash := rawHash[:]
+	job.argHash = argHash
 	return job
 }
 
@@ -158,12 +166,7 @@ func (fj *failedJobs) add(job *Job) {
 	fj.mutex.Unlock()
 }
 
-func newEventEntry(j *Job, startTime, endTime int64) EventFileEntry {
-	sum := sha256.Sum256([]byte(j.Cmd))
-	return EventFileEntry{JobID: j.ID, StartTime: startTime, EndTime: endTime, ArgHash: sum}
-}
-
-func (j *Job) runJob(wg *sync.WaitGroup, bwp *chanWriter) {
+func (j *Job) runJob(wg *sync.WaitGroup, db *bolt.DB) {
 	defer wg.Done()
 	if j.checkOutputs() {
 		return
@@ -184,26 +187,28 @@ func (j *Job) runJob(wg *sync.WaitGroup, bwp *chanWriter) {
 	cmd.Stderr = errLog
 	cmd.Dir = j.workflow.WorkflowDir
 
-	startTime := time.Now().UnixNano()
+	// startTime := time.Now().UnixNano()
 	err = cmd.Run()
-	endTime := time.Now().UnixNano()
+	// endTime := time.Now().UnixNano()
+
 	switch {
 	case err == nil:
 		log.Println("Job Succeeded: job_id:", j.ID)
-		efe := newEventEntry(j, startTime, endTime)
-		bwp.Write(efe)
+		addJob(db, j.argHash, 0)
 	case j.checkOutputs() == false:
 		log.Println("Job Failed: outputs do not exist: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
+		addJob(db, j.argHash, 1)
 	default:
 		log.Println("Job Failed: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
+		addJob(db, j.argHash, 1)
 	}
 
 	for _, d := range j.Dependencies {
 		d.initJob()
 		depWg.Add(1)
-		go d.runJob(wg, bwp)
+		go d.runJob(wg, db)
 	}
 	depWg.Wait()
 }
