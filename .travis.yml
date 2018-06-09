@@ -1,2 +1,11 @@
 language: go
+
+go:
+#  - "1.x"
+#  - "1.8.x"
+  - "1.10.x"
+
+before_install:
+  - dep ensure
+
 script: make test TEST_OPTS='-v -cover -race'
