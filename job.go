@@ -86,7 +86,7 @@ func (j *Job) createJobDirs() {
 	}
 }
 
-func fileExists(path string) (exists bool, err error) {
+func pathExists(path string) (exists bool, err error) {
 	_, err = os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
@@ -97,7 +97,7 @@ func fileExists(path string) (exists bool, err error) {
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
 		d = path.Join(j.workflow.WorkflowDir, d)
-		exists, err := fileExists(d)
+		exists, err := pathExists(d)
 		switch {
 		case err != nil:
 			log.Printf("Failed to stat dir '%s' job_id:%d error:'%s'", d, j.ID, err.Error())
@@ -139,7 +139,7 @@ func (j *Job) checkOutputs() bool {
 		return false
 	}
 	for _, f := range j.Outputs {
-		exists, err := fileExists(f)
+		exists, err := pathExists(f)
 		if err != nil {
 			log.Printf("Failed to stat file '%s' job_id:%d error:'%s'", f, j.ID, err.Error())
 			return false
@@ -188,21 +188,23 @@ func (j *Job) runJob(wg *sync.WaitGroup, db *bolt.DB) {
 	cmd.Dir = j.workflow.WorkflowDir
 
 	// startTime := time.Now().UnixNano()
-	err = cmd.Run()
+	exists, err := jobExists(db, j.argHash)
+	if !exists {
+		err = cmd.Run()
+	}
 	// endTime := time.Now().UnixNano()
 
 	switch {
 	case err == nil:
 		log.Println("Job Succeeded: job_id:", j.ID)
-		addJob(db, j.argHash, 0)
+		addJob(db, j.argHash)
 	case j.checkOutputs() == false:
 		log.Println("Job Failed: outputs do not exist: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
-		addJob(db, j.argHash, 1)
 	default:
 		log.Println("Job Failed: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
-		addJob(db, j.argHash, 1)
+		addJob(db, j.argHash)
 	}
 
 	for _, d := range j.Dependencies {
