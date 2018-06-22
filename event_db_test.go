@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "fmt"
 	"os"
 	"path"
 	"testing"
@@ -73,32 +72,3 @@ func TestJobExists(t *testing.T) {
 
 	jobMustExist(t, db, someArgHash)
 }
-
-// TODO: Table tests will look something like this.... ish
-
-// import (
-// 	"path"
-// 	"testing"
-
-// 	"github.com/boltdb/bolt"
-// )
-
-// func TestJobOperations(t *testing.T) {
-// 	testCases := []struct {
-// 		name string
-// 		fn   func() error
-// 	}{
-// 		{"TestAddJob", addJob(db, []byte("ohai"), 1)},
-// 	}
-
-// 	for _, tc := range testCases {
-// 		t.Run(tc.name, func(t *testing.T) {
-// 			defer cleanTestData(t)
-// 			db, err := setupEventDB(path.Join(OutputDir, tc.name))
-// 			if err != nil {
-// 				t.Error(err)
-// 			}
-// 			defer db.Close()
-// 		})
-// 	}
-// }
