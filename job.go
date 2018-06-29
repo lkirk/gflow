@@ -37,7 +37,7 @@ func newJob(wf *Workflow, dirs []string, deps []*Job, outputs []string, clean bo
 	job := &Job{wf, []byte{}, JobID, dirs, deps, outputs, clean, cmd}
 	job.Cmd = templateExecutable(job)
 	rawHash := sha256.Sum256([]byte(job.Cmd))
-	argHash := rawHash[:]
+	argHash := append([]byte(strconv.Itoa(job.ID)), rawHash[:]...)
 	job.argHash = argHash
 	return job
 }
@@ -187,12 +187,10 @@ func (j *Job) runJob(wg *sync.WaitGroup, db *bolt.DB) {
 	cmd.Stderr = errLog
 	cmd.Dir = j.workflow.WorkflowDir
 
-	// startTime := time.Now().UnixNano()
 	exists, err := jobExists(db, j.argHash)
 	if !exists {
 		err = cmd.Run()
 	}
-	// endTime := time.Now().UnixNano()
 
 	switch {
 	case err == nil:
