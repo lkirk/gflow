@@ -37,7 +37,7 @@ func newJob(wf *Workflow, dirs []string, deps []*Job, outputs []string, clean bo
 	job := &Job{wf, []byte{}, JobID, dirs, deps, outputs, clean, cmd}
 	job.Cmd = templateExecutable(job)
 	rawHash := sha256.Sum256([]byte(job.Cmd))
-	argHash := append([]byte(strconv.Itoa(job.ID)), rawHash[:]...)
+	argHash := append([]byte(strconv.Itoa(job.ID), "."), rawHash[:]...)
 	job.argHash = argHash
 	return job
 }
