@@ -1,2 +1,12 @@
 language: go
+
+go:
+#  - "1.x"
+#  - "1.8.x"
+  - "1.10.x"
+
+before_install:
+  - go get -u github.com/golang/dep/cmd/dep # TODO: is there a better way?
+  - dep ensure
+
 script: make test TEST_OPTS='-v -cover -race'

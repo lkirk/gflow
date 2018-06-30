@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"io/ioutil"
 	"log"
 	"os"
@@ -8,6 +9,9 @@ import (
 	"path"
 	"strconv"
 	"sync"
+	// "time"
+
+	"github.com/boltdb/bolt"
 )
 
 // The Job type abstracts the execution of an executable.
@@ -16,6 +20,9 @@ import (
 // If a job fails, dependent jobs will not execute
 type Job struct {
 	workflow *Workflow
+
+	// argHash  [sha256.Size]byte
+	argHash []byte
 
 	ID           int      `json:"id"`
 	Directories  []string `json:"directories"`
@@ -27,8 +34,11 @@ type Job struct {
 
 func newJob(wf *Workflow, dirs []string, deps []*Job, outputs []string, clean bool, cmd string) *Job {
 	JobID := wf.incrementCurrentJobID()
-	job := &Job{wf, JobID, dirs, deps, outputs, clean, cmd}
+	job := &Job{wf, []byte{}, JobID, dirs, deps, outputs, clean, cmd}
 	job.Cmd = templateExecutable(job)
+	rawHash := sha256.Sum256([]byte(job.Cmd))
+	argHash := append(append([]byte(strconv.Itoa(job.ID)), []byte(".")[:]...), rawHash[:]...)
+	job.argHash = argHash
 	return job
 }
 
@@ -76,7 +86,7 @@ func (j *Job) createJobDirs() {
 	}
 }
 
-func fileExists(path string) (exists bool, err error) {
+func pathExists(path string) (exists bool, err error) {
 	_, err = os.Stat(path)
 	if os.IsNotExist(err) {
 		return false, nil
@@ -87,7 +97,7 @@ func fileExists(path string) (exists bool, err error) {
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
 		d = path.Join(j.workflow.WorkflowDir, d)
-		exists, err := fileExists(d)
+		exists, err := pathExists(d)
 		switch {
 		case err != nil:
 			log.Printf("Failed to stat dir '%s' job_id:%d error:'%s'", d, j.ID, err.Error())
@@ -129,7 +139,7 @@ func (j *Job) checkOutputs() bool {
 		return false
 	}
 	for _, f := range j.Outputs {
-		exists, err := fileExists(f)
+		exists, err := pathExists(f)
 		if err != nil {
 			log.Printf("Failed to stat file '%s' job_id:%d error:'%s'", f, j.ID, err.Error())
 			return false
@@ -156,7 +166,7 @@ func (fj *failedJobs) add(job *Job) {
 	fj.mutex.Unlock()
 }
 
-func (j *Job) runJob(wg *sync.WaitGroup) {
+func (j *Job) runJob(wg *sync.WaitGroup, db *bolt.DB) {
 	defer wg.Done()
 	if j.checkOutputs() {
 		return
@@ -177,22 +187,28 @@ func (j *Job) runJob(wg *sync.WaitGroup) {
 	cmd.Stderr = errLog
 	cmd.Dir = j.workflow.WorkflowDir
 
-	err = cmd.Run()
+	exists, err := jobExists(db, j.argHash)
+	if !exists {
+		err = cmd.Run()
+	}
+
 	switch {
 	case err == nil:
 		log.Println("Job Succeeded: job_id:", j.ID)
+		addJob(db, j.argHash)
 	case j.checkOutputs() == false:
 		log.Println("Job Failed: outputs do not exist: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
 	default:
 		log.Println("Job Failed: job_id:", j.ID, err)
 		j.workflow.failedJobs.add(j)
+		addJob(db, j.argHash)
 	}
 
 	for _, d := range j.Dependencies {
 		d.initJob()
 		depWg.Add(1)
-		go d.runJob(wg)
+		go d.runJob(wg, db)
 	}
 	depWg.Wait()
 }

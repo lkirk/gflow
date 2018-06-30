@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	// "fmt"
 	"io/ioutil"
 	"log"
 	"os"
@@ -29,7 +28,9 @@ type Workflow struct {
 	ExecDir     string `json:"exec_dir"`
 	TmpDir      string `json:"tmp_dir"`
 	WFJsonPath  string `json:"wf_json_path"`
-	Jobs        []*Job `json:"jobs"`
+	EventDBPath string `json:"event_file_path"`
+
+	Jobs []*Job `json:"jobs"`
 
 	currentJobID int
 	jobIDLock    *sync.Mutex
@@ -49,9 +50,9 @@ func (w *Workflow) AddJob(j ...*Job) {
 	w.Jobs = append(w.Jobs, j...)
 }
 
-func (w *Workflow) pathToWDir(s ...string) string {
-	return path.Join(append([]string{w.WorkflowDir}, s...)...)
-}
+// func (w *Workflow) pathToWDir(s ...string) string {
+// 	return path.Join(append([]string{w.WorkflowDir}, s...)...)
+// }
 
 func (w *Workflow) createWorkflowDirs() {
 	// TODO: where do responsibilities stop?
@@ -91,9 +92,10 @@ func newWorkflow(wfDir string) *Workflow {
 	execDir := path.Join(absWfDir, ".gflow", "exec")
 	tmpDir := path.Join(absWfDir, ".gflow", "tmp")
 	wfJSONPath := path.Join(absWfDir, ".gflow", "wf.json")
+	eventDBPath := path.Join(absWfDir, ".gflow", "event.db")
 
 	wf := &Workflow{
-		absWfDir, logDir, execDir, tmpDir, wfJSONPath,
+		absWfDir, logDir, execDir, tmpDir, wfJSONPath, eventDBPath,
 		[]*Job{}, 0, &sync.Mutex{}, newFailedJobs(),
 	}
 	wf.createWorkflowDirs()
@@ -130,13 +132,19 @@ func (w *Workflow) Run() int {
 	w.initWorkflow()
 	wg := &sync.WaitGroup{}
 
+	db, err := setupEventDB(w.EventDBPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
 	for _, j := range w.Jobs {
 		err := j.initJob()
 		if err != nil {
 			log.Fatalf("Failed initializing job_id: %d", j.ID)
 		}
 		wg.Add(1)
-		go j.runJob(wg)
+		go j.runJob(wg, db)
 	}
 
 	wg.Wait()
@@ -174,7 +182,7 @@ func workflowFromYaml(yamlPath string) *Workflow {
 	return &w
 }
 
-func RunFromYaml(yamlPath string) int {
+func runFromYaml(yamlPath string) int {
 	w := workflowFromYaml(yamlPath)
 	return w.Run()
 }
