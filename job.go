@@ -55,17 +55,17 @@ func (j *Job) AddDependency(deps ...*Job) {
 }
 
 func (j *Job) pathToExec(s ...string) string {
-	jobExecDir := []string{j.workflow.ExecDir, strconv.Itoa(j.ID)}
+	jobExecDir := []string{j.workflow.execDir, strconv.Itoa(j.ID)}
 	return path.Join(append(jobExecDir, s...)...)
 }
 
 func (j *Job) pathToLog(s ...string) string {
-	jobLogDir := []string{j.workflow.LogDir, strconv.Itoa(j.ID)}
+	jobLogDir := []string{j.workflow.logDir, strconv.Itoa(j.ID)}
 	return path.Join(append(jobLogDir, s...)...)
 }
 
 func (j *Job) pathToTmp(s ...string) string {
-	jobTmpDir := []string{j.workflow.TmpDir, strconv.Itoa(j.ID)}
+	jobTmpDir := []string{j.workflow.tmpDir, strconv.Itoa(j.ID)}
 	return path.Join(append(jobTmpDir, s...)...)
 }
 

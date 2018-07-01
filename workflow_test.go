@@ -81,7 +81,7 @@ func TestRunWorkflow(t *testing.T) {
 			wf.Run()
 
 			if tc.verifyJobExistence {
-				db, err := setupEventDB(wf.EventDBPath)
+				db, err := setupEventDB(wf.eventDBPath)
 				if err != nil {
 					t.Error(err)
 				}

@@ -24,11 +24,11 @@ const (
 // A Workflow dir will contain logs, scripts, and the PATH of the process
 type Workflow struct {
 	WorkflowDir string `json:"workflow_dir"`
-	LogDir      string `json:"log_dir"`
-	ExecDir     string `json:"exec_dir"`
-	TmpDir      string `json:"tmp_dir"`
-	WFJsonPath  string `json:"wf_json_path"`
-	EventDBPath string `json:"event_file_path"`
+	logDir      string
+	execDir     string
+	tmpDir      string
+	wfJSONPath  string
+	eventDBPath string
 
 	Jobs []*Job `json:"jobs"`
 
@@ -68,7 +68,7 @@ func (w *Workflow) createWorkflowDirs() {
 	// 	log.Fatal(err)
 	// }
 
-	for _, d := range []string{w.WorkflowDir, w.ExecDir, w.LogDir} {
+	for _, d := range []string{w.WorkflowDir, w.execDir, w.logDir} {
 		err := os.MkdirAll(d, 0755)
 		if err != nil {
 			log.Fatal(err)
@@ -112,7 +112,7 @@ func (w *Workflow) inferExitStatus() int {
 }
 
 func (w *Workflow) writeWorkflowJSON() {
-	f, err := os.Create(w.WFJsonPath)
+	f, err := os.Create(w.wfJSONPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -132,7 +132,7 @@ func (w *Workflow) Run() int {
 	w.initWorkflow()
 	wg := &sync.WaitGroup{}
 
-	db, err := setupEventDB(w.EventDBPath)
+	db, err := setupEventDB(w.eventDBPath)
 	if err != nil {
 		log.Fatal(err)
 	}
