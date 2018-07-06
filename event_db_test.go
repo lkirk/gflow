@@ -36,7 +36,7 @@ func jobMustExist(t *testing.T, db *bolt.DB, argHash []byte) {
 
 func TestAddJob(t *testing.T) {
 	name := "AddJob"
-	db := mustTestDb(t, path.Join(OutputDir, name, "test.db"))
+	db := mustTestDb(t, path.Join(OutputDir, name))
 	defer db.Close()
 
 	err := addJob(db, []byte("ohai"))
