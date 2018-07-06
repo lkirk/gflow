@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 )
 
@@ -102,7 +102,7 @@ func TestRunWorkflow(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			defer cleanTestData(t)
 
-			wf := newWorkflow(path.Join(OutputDir, tc.name))
+			wf := newWorkflow(filepath.Join(OutputDir, tc.name))
 			jobs := tc.jobs(wf)
 
 			wf.AddJob(jobs...)

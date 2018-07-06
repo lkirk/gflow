@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strconv"
 	"sync"
 	// "time"
@@ -56,17 +56,17 @@ func (j *Job) AddDependency(deps ...*Job) {
 
 func (j *Job) pathToExec(s ...string) string {
 	jobExecDir := []string{j.workflow.execDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobExecDir, s...)...)
+	return filepath.Join(append(jobExecDir, s...)...)
 }
 
 func (j *Job) pathToLog(s ...string) string {
 	jobLogDir := []string{j.workflow.logDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobLogDir, s...)...)
+	return filepath.Join(append(jobLogDir, s...)...)
 }
 
 func (j *Job) pathToTmp(s ...string) string {
 	jobTmpDir := []string{j.workflow.tmpDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobTmpDir, s...)...)
+	return filepath.Join(append(jobTmpDir, s...)...)
 }
 
 func (j *Job) pathToOutLog() string {
@@ -96,7 +96,7 @@ func pathExists(path string) (exists bool, err error) {
 
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
-		d = path.Join(j.workflow.WorkflowDir, d)
+		d = j.workflow.pathToWfDir(d)
 		exists, err := pathExists(d)
 		switch {
 		case err != nil:
@@ -105,7 +105,8 @@ func (j *Job) createDirectories() (err error) {
 		case exists:
 			return nil
 		default:
-			log.Println("creating:", d)
+			relPath, err := filepath.Rel(j.workflow.WorkflowDir, d)
+			log.Println("creating:", relPath)
 			err = os.MkdirAll(d, 0755)
 			if err != nil {
 				return err
@@ -139,7 +140,7 @@ func (j *Job) checkOutputs() bool {
 		return true
 	}
 	for _, f := range j.Outputs {
-		f = path.Join(j.workflow.WorkflowDir, f)
+		f = j.workflow.pathToWfDir(f)
 		exists, err := pathExists(f)
 		if err != nil {
 			log.Printf("Failed to stat file '%s' job_id:%d error:'%s'", f, j.ID, err.Error())

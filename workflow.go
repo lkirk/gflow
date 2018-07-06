@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -50,9 +49,9 @@ func (w *Workflow) AddJob(j ...*Job) {
 	w.Jobs = append(w.Jobs, j...)
 }
 
-// func (w *Workflow) pathToWDir(s ...string) string {
-// 	return path.Join(append([]string{w.WorkflowDir}, s...)...)
-// }
+func (w *Workflow) pathToWfDir(s ...string) string {
+	return filepath.Join(append([]string{w.WorkflowDir}, s...)...)
+}
 
 func (w *Workflow) createWorkflowDirs() {
 	// TODO: where do responsibilities stop?
@@ -88,11 +87,11 @@ func newWorkflow(wfDir string) *Workflow {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logDir := path.Join(absWfDir, ".gflow", "log")
-	execDir := path.Join(absWfDir, ".gflow", "exec")
-	tmpDir := path.Join(absWfDir, ".gflow", "tmp")
-	wfJSONPath := path.Join(absWfDir, ".gflow", "wf.json")
-	eventDBPath := path.Join(absWfDir, ".gflow", "event.db")
+	logDir := filepath.Join(absWfDir, ".gflow", "log")
+	execDir := filepath.Join(absWfDir, ".gflow", "exec")
+	tmpDir := filepath.Join(absWfDir, ".gflow", "tmp")
+	wfJSONPath := filepath.Join(absWfDir, ".gflow", "wf.json")
+	eventDBPath := filepath.Join(absWfDir, ".gflow", "event.db")
 
 	wf := &Workflow{
 		absWfDir, logDir, execDir, tmpDir, wfJSONPath, eventDBPath,
