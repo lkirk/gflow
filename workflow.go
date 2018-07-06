@@ -158,13 +158,6 @@ func (w *Workflow) Run() int {
 	return exitStatus
 }
 
-func addWorkflowBackref(w *Workflow, jobs []*Job) {
-	for _, j := range jobs {
-		j.workflow = w
-		addWorkflowBackref(w, j.Dependencies)
-	}
-}
-
 func newJobFromJob(w *Workflow, j *Job, deps []*Job) *Job {
 	return newJob(w, j.Directories, deps, j.Outputs, j.CleanTmp, j.Cmd)
 }
