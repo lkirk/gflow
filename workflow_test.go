@@ -39,7 +39,7 @@ func expectNonZero(t *testing.T, status int) {
 
 func TestRunWorkflowFromYAML(t *testing.T) {
 	yamlBytes := []byte(`
-workflow_dir: testoutput/TestRunWorkflowFromYAML
+workflow_dir: testoutput/RunWorkflowFromYAML
 jobs:
 - directories:
   - out
