@@ -96,8 +96,8 @@ func pathExists(path string) (exists bool, err error) {
 
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
-		d = j.workflow.pathToWfDir(d)
-		exists, err := pathExists(d)
+		abs := j.workflow.pathToWfDir(d)
+		exists, err := pathExists(abs)
 		switch {
 		case err != nil:
 			log.Printf("Failed to stat dir '%s' job_id:%d error:'%s'", d, j.ID, err.Error())
@@ -105,9 +105,8 @@ func (j *Job) createDirectories() (err error) {
 		case exists:
 			return nil
 		default:
-			relPath, err := filepath.Rel(j.workflow.WorkflowDir, d)
-			log.Println("creating:", relPath)
-			err = os.MkdirAll(d, 0755)
+			log.Println("creating:", d)
+			err = os.MkdirAll(abs, 0755)
 			if err != nil {
 				return err
 			}
