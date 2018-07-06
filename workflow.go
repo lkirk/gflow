@@ -165,21 +165,31 @@ func addWorkflowBackref(w *Workflow, jobs []*Job) {
 	}
 }
 
+func newJobFromJob(w *Workflow, j *Job, deps []*Job) *Job {
+	return newJob(w, j.Directories, deps, j.Outputs, j.CleanTmp, j.Cmd)
+}
+
 func workflowFromYaml(yamlPath string) *Workflow {
 	yamlBytes, err := ioutil.ReadFile(yamlPath)
 	if err != nil {
 		log.Fatalf("Error reading workflow yaml: %v\n", err)
 	}
-	var w Workflow
-	err = yaml.Unmarshal(yamlBytes, &w)
+	var yw Workflow
+	err = yaml.Unmarshal(yamlBytes, &yw)
 	if err != nil {
 		log.Fatalf("Error unmarshalling workflow: %v\n", err)
 	}
-	w.currentJobID = 0
-	w.jobIDLock = &sync.Mutex{}
-	w.failedJobs = newFailedJobs()
-	addWorkflowBackref(&w, w.Jobs)
-	return &w
+	w := newWorkflow(yw.WorkflowDir)
+	jobs := []*Job{}
+	for _, job := range yw.Jobs {
+		deps := []*Job{}
+		for _, depJob := range job.Dependencies {
+			deps = append(jobs, newJobFromJob(w, depJob, deps))
+		}
+		jobs = append(jobs, newJobFromJob(w, job, deps))
+	}
+	w.Jobs = jobs
+	return w
 }
 
 func runFromYaml(yamlPath string) int {
