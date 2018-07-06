@@ -162,13 +162,9 @@ func newJobFromJob(w *Workflow, j *Job, deps []*Job) *Job {
 	return newJob(w, j.Directories, deps, j.Outputs, j.CleanTmp, j.Cmd)
 }
 
-func workflowFromYaml(yamlPath string) *Workflow {
-	yamlBytes, err := ioutil.ReadFile(yamlPath)
-	if err != nil {
-		log.Fatalf("Error reading workflow yaml: %v\n", err)
-	}
+func workflowFromYaml(yamlBytes []byte) *Workflow {
 	var yw Workflow
-	err = yaml.Unmarshal(yamlBytes, &yw)
+	err := yaml.Unmarshal(yamlBytes, &yw)
 	if err != nil {
 		log.Fatalf("Error unmarshalling workflow: %v\n", err)
 	}
@@ -186,6 +182,10 @@ func workflowFromYaml(yamlPath string) *Workflow {
 }
 
 func runFromYaml(yamlPath string) int {
-	w := workflowFromYaml(yamlPath)
+	yamlBytes, err := ioutil.ReadFile(yamlPath)
+	if err != nil {
+		log.Fatalf("Error reading workflow yaml: %v\n", err)
+	}
+	w := workflowFromYaml(yamlBytes)
 	return w.Run()
 }

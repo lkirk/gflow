@@ -37,6 +37,28 @@ func expectNonZero(t *testing.T, status int) {
 	}
 }
 
+func TestRunWorkflowFromYAML(t *testing.T) {
+	yamlBytes := []byte(`
+workflow_dir: testoutput/TestRunWorkflowFromYAML
+jobs:
+- directories:
+  - out
+  clean_tmp: true
+  dependencies:
+  - directories:
+    - out
+    clean_tmp: true
+    dependencies:
+    outputs: [out/test_out.txt, out/wef.txt]
+    cmd: grep -o some out/test_a.txt > out/test_out.txt
+  outputs: [out/test_a.txt]
+  cmd: echo 'some test output' > out/test_a.txt
+`)
+	w := workflowFromYaml(yamlBytes)
+	expectZero(t, w.Run())
+	// TODO: convert all tests to yaml tests.
+}
+
 func TestRunWorkflow(t *testing.T) {
 	testCases := []struct {
 		name               string
