@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"sync"
@@ -24,11 +23,11 @@ const (
 // A Workflow dir will contain logs, scripts, and the PATH of the process
 type Workflow struct {
 	WorkflowDir string `json:"workflow_dir"`
-	LogDir      string `json:"log_dir"`
-	ExecDir     string `json:"exec_dir"`
-	TmpDir      string `json:"tmp_dir"`
-	WFJsonPath  string `json:"wf_json_path"`
-	EventDBPath string `json:"event_file_path"`
+	logDir      string
+	execDir     string
+	tmpDir      string
+	wfJSONPath  string
+	eventDBPath string
 
 	Jobs []*Job `json:"jobs"`
 
@@ -50,9 +49,9 @@ func (w *Workflow) AddJob(j ...*Job) {
 	w.Jobs = append(w.Jobs, j...)
 }
 
-// func (w *Workflow) pathToWDir(s ...string) string {
-// 	return path.Join(append([]string{w.WorkflowDir}, s...)...)
-// }
+func (w *Workflow) pathToWfDir(s ...string) string {
+	return filepath.Join(append([]string{w.WorkflowDir}, s...)...)
+}
 
 func (w *Workflow) createWorkflowDirs() {
 	// TODO: where do responsibilities stop?
@@ -68,7 +67,7 @@ func (w *Workflow) createWorkflowDirs() {
 	// 	log.Fatal(err)
 	// }
 
-	for _, d := range []string{w.WorkflowDir, w.ExecDir, w.LogDir} {
+	for _, d := range []string{w.WorkflowDir, w.execDir, w.logDir} {
 		err := os.MkdirAll(d, 0755)
 		if err != nil {
 			log.Fatal(err)
@@ -88,11 +87,11 @@ func newWorkflow(wfDir string) *Workflow {
 	if err != nil {
 		log.Fatal(err)
 	}
-	logDir := path.Join(absWfDir, ".gflow", "log")
-	execDir := path.Join(absWfDir, ".gflow", "exec")
-	tmpDir := path.Join(absWfDir, ".gflow", "tmp")
-	wfJSONPath := path.Join(absWfDir, ".gflow", "wf.json")
-	eventDBPath := path.Join(absWfDir, ".gflow", "event.db")
+	logDir := filepath.Join(absWfDir, ".gflow", "log")
+	execDir := filepath.Join(absWfDir, ".gflow", "exec")
+	tmpDir := filepath.Join(absWfDir, ".gflow", "tmp")
+	wfJSONPath := filepath.Join(absWfDir, ".gflow", "wf.json")
+	eventDBPath := filepath.Join(absWfDir, ".gflow", "event.db")
 
 	wf := &Workflow{
 		absWfDir, logDir, execDir, tmpDir, wfJSONPath, eventDBPath,
@@ -112,7 +111,7 @@ func (w *Workflow) inferExitStatus() int {
 }
 
 func (w *Workflow) writeWorkflowJSON() {
-	f, err := os.Create(w.WFJsonPath)
+	f, err := os.Create(w.wfJSONPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -132,7 +131,7 @@ func (w *Workflow) Run() int {
 	w.initWorkflow()
 	wg := &sync.WaitGroup{}
 
-	db, err := setupEventDB(w.EventDBPath)
+	db, err := setupEventDB(w.eventDBPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -158,31 +157,34 @@ func (w *Workflow) Run() int {
 	return exitStatus
 }
 
-func addWorkflowBackref(w *Workflow, jobs []*Job) {
-	for _, j := range jobs {
-		j.workflow = w
-		addWorkflowBackref(w, j.Dependencies)
-	}
+func newJobFromJob(w *Workflow, j *Job, deps []*Job) *Job {
+	return newJob(w, j.Directories, deps, j.Outputs, j.CleanTmp, j.Cmd)
 }
 
-func workflowFromYaml(yamlPath string) *Workflow {
+func workflowFromYaml(yamlBytes []byte) *Workflow {
+	var yw Workflow
+	err := yaml.Unmarshal(yamlBytes, &yw)
+	if err != nil {
+		log.Fatalf("Error unmarshalling workflow: %v\n", err)
+	}
+	w := newWorkflow(yw.WorkflowDir)
+	jobs := []*Job{}
+	for _, job := range yw.Jobs {
+		deps := []*Job{}
+		for _, depJob := range job.Dependencies {
+			deps = append(jobs, newJobFromJob(w, depJob, deps))
+		}
+		jobs = append(jobs, newJobFromJob(w, job, deps))
+	}
+	w.Jobs = jobs
+	return w
+}
+
+func runFromYaml(yamlPath string) int {
 	yamlBytes, err := ioutil.ReadFile(yamlPath)
 	if err != nil {
 		log.Fatalf("Error reading workflow yaml: %v\n", err)
 	}
-	var w Workflow
-	err = yaml.Unmarshal(yamlBytes, &w)
-	if err != nil {
-		log.Fatalf("Error unmarshalling workflow: %v\n", err)
-	}
-	w.currentJobID = 0
-	w.jobIDLock = &sync.Mutex{}
-	w.failedJobs = newFailedJobs()
-	addWorkflowBackref(&w, w.Jobs)
-	return &w
-}
-
-func runFromYaml(yamlPath string) int {
-	w := workflowFromYaml(yamlPath)
+	w := workflowFromYaml(yamlBytes)
 	return w.Run()
 }
