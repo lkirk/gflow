@@ -2,7 +2,7 @@ package main
 
 import (
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/boltdb/bolt"
@@ -16,7 +16,7 @@ func mustTestDb(t *testing.T, dbPath string) (db *bolt.DB) {
 		t.Error(err)
 	}
 
-	db, err = setupEventDB(path.Join(dbPath, "test.db"))
+	db, err = setupEventDB(filepath.Join(dbPath, "test.db"))
 	if err != nil {
 		t.Error(err)
 	}
@@ -36,7 +36,7 @@ func jobMustExist(t *testing.T, db *bolt.DB, argHash []byte) {
 
 func TestAddJob(t *testing.T) {
 	name := "AddJob"
-	db := mustTestDb(t, path.Join(OutputDir, name, "test.db"))
+	db := mustTestDb(t, filepath.Join(OutputDir, name))
 	defer db.Close()
 
 	err := addJob(db, []byte("ohai"))
@@ -47,7 +47,7 @@ func TestAddJob(t *testing.T) {
 
 func TestJobNoExist(t *testing.T) {
 	name := "JobNoExist"
-	db := mustTestDb(t, path.Join(OutputDir, name))
+	db := mustTestDb(t, filepath.Join(OutputDir, name))
 	defer db.Close()
 
 	je, err := jobExists(db, someArgHash)
@@ -62,7 +62,7 @@ func TestJobNoExist(t *testing.T) {
 
 func TestJobExists(t *testing.T) {
 	name := "JobExists"
-	db := mustTestDb(t, path.Join(OutputDir, name))
+	db := mustTestDb(t, filepath.Join(OutputDir, name))
 	defer db.Close()
 
 	err := addJob(db, someArgHash)

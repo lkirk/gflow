@@ -2,12 +2,11 @@
 DEFAULT_GOAL: go-build
 .PHONY: go-build clean
 
-WD:=$(patsubst %/,%,$(dir $(abspath $(lastword $(MAKEFILE_LIST)))))
 SHELL:=/bin/bash -eo pipefail
 SUB_MAKE_OPTS:=--no-print-directory
 MAKE+=$(SUB_MAKE_OPTS)
 
-gflow:=$(WD)/gflow
+gflow:=gflow
 
 go-build: $(gflow)
 
@@ -40,9 +39,8 @@ $(gflow):
 ## remove binary
 .PHONY: clean
 clean:
-	rm -f $(_COVERAGE_REPORT)
-	rm -f $(gflow)
-	rm -rf $(WD)/testoutput
+	rm -f $(_COVERAGE_REPORT) $(gflow)
+	rm -rf testoutput
 
 ## release
 RELEASE-INCREMENTS:=major minor patch
@@ -66,7 +64,7 @@ release-$(1):
 	NEW_VERSION=$$$$(git describe | ./scripts/increment-version $(1)) ;\
 	git checkout dev ;\
 	sed -i -re"s/[0-9]+\.[0-9]+\.[0-9]+/$$$$NEW_VERSION/g" \
-		$(WD)/README.org ;\
+		README.org ;\
 	git push ;\
 	git checkout master ;\
 	git merge --no-ff -m'Merge dev into master by Makefile' dev ;\

@@ -2,11 +2,12 @@ package main
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
-	"path"
+	"path/filepath"
 	"strconv"
 	"sync"
 	// "time"
@@ -21,7 +22,6 @@ import (
 type Job struct {
 	workflow *Workflow
 
-	// argHash  [sha256.Size]byte
 	argHash []byte
 
 	ID           int      `json:"id"`
@@ -55,18 +55,18 @@ func (j *Job) AddDependency(deps ...*Job) {
 }
 
 func (j *Job) pathToExec(s ...string) string {
-	jobExecDir := []string{j.workflow.ExecDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobExecDir, s...)...)
+	jobExecDir := []string{j.workflow.execDir, strconv.Itoa(j.ID)}
+	return filepath.Join(append(jobExecDir, s...)...)
 }
 
 func (j *Job) pathToLog(s ...string) string {
-	jobLogDir := []string{j.workflow.LogDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobLogDir, s...)...)
+	jobLogDir := []string{j.workflow.logDir, strconv.Itoa(j.ID)}
+	return filepath.Join(append(jobLogDir, s...)...)
 }
 
 func (j *Job) pathToTmp(s ...string) string {
-	jobTmpDir := []string{j.workflow.TmpDir, strconv.Itoa(j.ID)}
-	return path.Join(append(jobTmpDir, s...)...)
+	jobTmpDir := []string{j.workflow.tmpDir, strconv.Itoa(j.ID)}
+	return filepath.Join(append(jobTmpDir, s...)...)
 }
 
 func (j *Job) pathToOutLog() string {
@@ -96,8 +96,8 @@ func pathExists(path string) (exists bool, err error) {
 
 func (j *Job) createDirectories() (err error) {
 	for _, d := range j.Directories {
-		d = path.Join(j.workflow.WorkflowDir, d)
-		exists, err := pathExists(d)
+		abs := j.workflow.pathToWfDir(d)
+		exists, err := pathExists(abs)
 		switch {
 		case err != nil:
 			log.Printf("Failed to stat dir '%s' job_id:%d error:'%s'", d, j.ID, err.Error())
@@ -105,8 +105,8 @@ func (j *Job) createDirectories() (err error) {
 		case exists:
 			return nil
 		default:
-			log.Println("creating: ", d)
-			err = os.MkdirAll(d, 0755)
+			log.Println("creating:", d)
+			err = os.MkdirAll(abs, 0755)
 			if err != nil {
 				return err
 			}
@@ -136,9 +136,10 @@ func (j *Job) openLogs() (outLog, errLog *os.File, err error) {
 
 func (j *Job) checkOutputs() bool {
 	if len(j.Outputs) == 0 {
-		return false
+		return true
 	}
 	for _, f := range j.Outputs {
+		f = j.workflow.pathToWfDir(f)
 		exists, err := pathExists(f)
 		if err != nil {
 			log.Printf("Failed to stat file '%s' job_id:%d error:'%s'", f, j.ID, err.Error())
@@ -168,10 +169,6 @@ func (fj *failedJobs) add(job *Job) {
 
 func (j *Job) runJob(wg *sync.WaitGroup, db *bolt.DB) {
 	defer wg.Done()
-	if j.checkOutputs() {
-		return
-	}
-
 	outLog, errLog, err := j.openLogs()
 	if err != nil {
 		log.Fatal(err)
@@ -188,21 +185,24 @@ func (j *Job) runJob(wg *sync.WaitGroup, db *bolt.DB) {
 	cmd.Dir = j.workflow.WorkflowDir
 
 	exists, err := jobExists(db, j.argHash)
-	if !exists {
-		err = cmd.Run()
-	}
-
 	switch {
-	case err == nil:
-		log.Println("Job Succeeded: job_id:", j.ID)
-		addJob(db, j.argHash)
-	case j.checkOutputs() == false:
-		log.Println("Job Failed: outputs do not exist: job_id:", j.ID, err)
-		j.workflow.failedJobs.add(j)
-	default:
-		log.Println("Job Failed: job_id:", j.ID, err)
-		j.workflow.failedJobs.add(j)
-		addJob(db, j.argHash)
+	case err != nil:
+		log.Fatal(fmt.Errorf("failed to check job existence %s", err))
+	case !exists:
+		err = cmd.Run()
+		switch {
+		case j.checkOutputs() == false:
+			log.Println("Job Failed: required outputs do not exist: job_id:", j.ID, j.Outputs)
+			j.workflow.failedJobs.add(j)
+		case err == nil:
+			log.Println("Job Succeeded: job_id:", j.ID)
+			addJob(db, j.argHash)
+		default:
+			log.Println("Job Failed: job_id:", j.ID, err)
+			j.workflow.failedJobs.add(j)
+		}
+	case exists:
+		log.Println("not running because job", j.ID, "has completed successfully")
 	}
 
 	for _, d := range j.Dependencies {
