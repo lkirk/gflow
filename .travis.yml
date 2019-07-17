@@ -3,4 +3,4 @@ language: go
 go:
   - "1.12.x"
 
-script: make test TEST_OPTS='-v -cover -race'
+script: env GO111MODULE=on make test TEST_OPTS='-v -cover -race'
