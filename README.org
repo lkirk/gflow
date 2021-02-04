@@ -6,3 +6,5 @@ API subject to change
 #+BEGIN_SRC
 make
 #+END_SRC
+
+NOTE: This was a fun project, but I'm discontinuing the effort, there are so many fantastic workflow managers out there... off to more interesting things!
